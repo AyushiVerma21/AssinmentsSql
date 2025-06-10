@@ -1,3 +1,5 @@
+
+```sql
 --  ASSIGNMENT 1-------------------------------------------
 
 -- 1
@@ -99,4 +101,4 @@ group by os.CHANGE_REASON;
 SELECT p.PRODUCT_ID, (ii.quantity_On_Hand_Total - ii.available_To_Promise_Total) AS THRESHOLD
 FROM product AS p
 JOIN Inventory_Item AS ii ON ii.product_id = p.product_id;
-
+```
