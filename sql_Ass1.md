@@ -3,45 +3,36 @@
 --  ASSIGNMENT 1-------------------------------------------
 
 -- 1
-SELECT pe.PARTY_ID, pe.FIRST_NAME, pe.LAST_NAME, cn.INFO_STRING as EMAIL,tn.CONTACT_NUMBER as PHONE, pe.CREATED_STAMP
-FROM person AS pe
-JOIN party_role AS pr ON pe.PARTY_ID = pr.PARTY_ID AND ROLE_TYPE_ID = 'CUSTOMER' 
-JOIN party_contact_mech AS pcm ON pe.PARTY_ID = pcm.PARTY_ID
-LEFT JOIN contact_mech AS cn ON pcm.CONTACT_MECH_ID = cn.CONTACT_MECH_ID AND cn.CONTACT_MECH_TYPE_ID IN ('EMAIL_ADDRESS','TELECOM_NUMBER')
-LEFT JOIN telecom_number AS tn ON tn.CONTACT_MECH_ID = cn.CONTACT_MECH_ID
-WHERE pe.CREATED_STAMP BETWEEN '2023-06-01 00:00:00' AND '2023-06-30 23:59:59';
+SELECT distinct p.PARTY_ID, pe.FIRST_NAME, pe.LAST_NAME, email_cm .INFO_STRING AS email, tn.CONTACT_NUMBER, p.CREATED_DATE
+FROM Party AS p
+JOIN Person AS pe ON p.PARTY_ID = pe.PARTY_ID
+JOIN Party_Role AS pr ON pr.PARTY_ID = p.PARTY_ID AND pr.ROLE_TYPE_ID = 'CUSTOMER'
+LEFT JOIN Party_Contact_Mech as e_pcm ON e_pcm.PARTY_ID = p.PARTY_ID
+LEFT JOIN Contact_Mech as email_cm ON email_cm.CONTACT_MECH_ID = e_pcm.CONTACT_MECH_ID AND email_cm.CONTACT_MECH_TYPE_ID = 'EMAIL_ADDRESS'
+LEFT JOIN Party_Contact_Mech as pcm_ph ON pcm_ph.PARTY_ID = p.PARTY_ID
+LEFT JOIN Contact_Mech as ph_cm ON ph_cm.CONTACT_MECH_ID = pcm_ph.CONTACT_MECH_ID AND ph_cm.CONTACT_MECH_TYPE_ID = 'TELECOM_NUMBER'
+LEFT JOIN Telecom_Number as tn ON tn.CONTACT_MECH_ID = ph_cm.CONTACT_MECH_ID
+WHERE p.CREATED_DATE >= '2023-06-01 00:00:00' AND p.CREATED_DATE <  '2023-07-01 00:00:00';
 
 -- 2
 select pro.PRODUCT_ID, pro.PRODUCT_TYPE_ID, pro.INTERNAL_NAME
 from product AS pro
 join Product_Type As pt on pt.PRODUCT_TYPE_ID=pro.PRODUCT_TYPE_ID 
-where  pt.IS_PHYSICAL='Y' 
-AND (pro.SALES_DISCONTINUATION_DATE IS NULL 
-AND pro.SUPPORT_DISCONTINUATION_DATE IS NULL);
+where  pt.IS_PHYSICAL='Y';
 
 -- 3
 select distinct GOOD_IDENTIFICATION_TYPE_ID  from good_identification gi;
 
-select pro.PRODUCT_ID, pro.PRODUCT_TYPE_ID, pro.INTERNAL_NAME, gi.GOOD_IDENTIFICATION_TYPE_ID as NETSUITE_ID
+select pro.PRODUCT_ID, pro.PRODUCT_TYPE_ID, pro.INTERNAL_NAME, gi.ID_VALUE as NETSUITE_ID
 from product AS pro
-join GOOD_IDENTIFICATION As gi on gi.PRODUCT_ID = pro.PRODUCT_ID
-where gi.GOOD_IDENTIFICATION_TYPE_ID='ERP_ID'
-and (gi.ID_VALUE IS NULL or gi.ID_VALUE ="");
-
-
-/*select * from good_identification where GOOD_IDENTIFICATION_TYPE_ID="SHOPIFY_PROD_ID";
-select * from shopify_product ;
-
-select pro.PRODUCT_ID , gi.ID_value AS SHOPIFY_PROD_ID , pro.PRODUCT_ID as HOTWAX_ID, gi.GOOD_IDENTIFICATION_TYPE_ID as ERP_ID
-from product AS pro
-JOIN GOOD_IDENTIFICATION As gi on gi.PRODUCT_ID = pro.PRODUCT_ID 
-where GOOD_IDENTIFICATION_TYPE_ID="SHOPIFY_PROD_ID" and gi.GOOD_IDENTIFICATION_TYPE_ID="ERP_ID" ; */
+left join GOOD_IDENTIFICATION As gi on gi.PRODUCT_ID = pro.PRODUCT_ID and gi.GOOD_IDENTIFICATION_TYPE_ID='NETSUITE_PRODUCT_ID'
+where (gi.ID_VALUE IS NULL);
 
 -- 4
 select pro.PRODUCT_ID , shop.SHOPIFY_PRODUCT_ID, pro.PRODUCT_ID as HOTWAX_ID, gi.GOOD_IDENTIFICATION_TYPE_ID as ERP_ID
 from product AS pro
 JOIN GOOD_IDENTIFICATION As gi on gi.PRODUCT_ID = pro.PRODUCT_ID
-JOIN shopify_product AS shop ON pro.PRODUCT_ID = shop.PRODUCT_ID
+JOIN shopify_shop_product AS shop ON pro.PRODUCT_ID = shop.PRODUCT_ID
 where gi.GOOD_IDENTIFICATION_TYPE_ID="ERP_ID";
 
 -- 5
@@ -76,7 +67,7 @@ FROM order_header oh
 join order_status os on oh.ORDER_ID = os.ORDER_ID 
 where os.STATUS_ID = "ORDER_COMPLETED"
 group by HOURS
-order by hours aesc;
+order by hours asc;
 
 -- 9
 select  count(oh.ORDER_ID) as TOTAL_ORDERS, sum(oh.GRAND_TOTAL) as TOTAL_REVENUE
