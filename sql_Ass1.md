@@ -18,11 +18,9 @@ WHERE p.CREATED_DATE >= '2023-06-01 00:00:00' AND p.CREATED_DATE <  '2023-07-01 
 select pro.PRODUCT_ID, pro.PRODUCT_TYPE_ID, pro.INTERNAL_NAME
 from product AS pro
 join Product_Type As pt on pt.PRODUCT_TYPE_ID=pro.PRODUCT_TYPE_ID 
-where  pt.IS_PHYSICAL='Y';
+where  pt.IS_PHYSICAL='Y' ;
 
 -- 3
-select distinct GOOD_IDENTIFICATION_TYPE_ID  from good_identification gi;
-
 select pro.PRODUCT_ID, pro.PRODUCT_TYPE_ID, pro.INTERNAL_NAME, gi.ID_VALUE as NETSUITE_ID
 from product AS pro
 left join GOOD_IDENTIFICATION As gi on gi.PRODUCT_ID = pro.PRODUCT_ID and gi.GOOD_IDENTIFICATION_TYPE_ID='NETSUITE_PRODUCT_ID'
@@ -36,16 +34,14 @@ JOIN shopify_shop_product AS shop ON pro.PRODUCT_ID = shop.PRODUCT_ID
 where gi.GOOD_IDENTIFICATION_TYPE_ID="ERP_ID";
 
 -- 5
-select p.product_id,  p.PRODUCT_TYPE_ID, oh.PRODUCT_STORE_ID, sum(oi.QUANTITY) AS TOTAL_QUANTITY, p.INTERNAL_NAME, f.FACILITY_ID, oh.EXTERNAL_ID, f.FACILITY_TYPE_ID, 
-ohis.ORDER_HISTORY_ID, oh.ORDER_ID, oi.ORDER_ITEM_SEQ_ID, oi.SHIP_GROUP_SEQ_ID
-from ORDER_HEADER AS oh
-join order_item AS oi ON oi.ORDER_ID=oh.ORDER_ID
-join product as p on p.product_id=oi.product_id
-join order_history as ohis on ohis.order_id= oh.order_id
-join facility as f on f.FACILITY_ID=p.FACILITY_ID
-where oh.status_id="ORDER_COMPLETED" and oh.order_date BETWEEN '2023-08-01 00:00:00' and '2023-08-31 23:59:59'
-group by p.product_id,  p.PRODUCT_TYPE_ID, oh.PRODUCT_STORE_ID, p.INTERNAL_NAME, f.FACILITY_ID, oh.EXTERNAL_ID, f.FACILITY_TYPE_ID, 
-ohis.ORDER_HISTORY_ID, oh.ORDER_ID, oi.ORDER_ITEM_SEQ_ID, oi.SHIP_GROUP_SEQ_ID;
+select oi.PRODUCT_ID ,p.PRODUCT_TYPE_ID ,psc.PRODUCT_STORE_ID ,oi.QUANTITY,p.INTERNAL_NAME, oi.EXTERNAL_ID,oi.ORDER_ID,oi.ORDER_ITEM_SEQ_ID,
+	oi.SHIP_GROUP_SEQ_ID,f.FACILITY_ID,f.FACILITY_TYPE_ID,oh.ORDER_HISTORY_ID  
+from order_item as oi 
+join order_status as os on os.ORDER_ID =oi.ORDER_ID  and  os.ORDER_STATUS_ID ="ORDER_COMPLETED" and  os.STATUS_DATETIME >'2023-08-01 00:00:00.000' and os.STATUS_DATETIME <'2023-09-01 00:00:00.000'
+join product as p on oi.PRODUCT_ID =p.PRODUCT_ID
+join product_store_catalog as psc  on psc.PROD_CATALOG_ID =oi.PROD_CATALOG_ID
+join facility as f  on f.PRODUCT_STORE_ID =psc.PRODUCT_STORE_ID
+join order_history as oh on oh.ORDER_ID =oi.ORDER_ID;
 
 -- 6
 select oh.ORDER_ID, oh.EXTERNAL_ID as Shopify_Order_ID, oh.Grand_Total as TOTAL_AMOUNT, opp.payment_Method_Type_Id as PAYMENT_METHOD
@@ -54,12 +50,12 @@ join Order_Payment_Preference as opp on opp.ORDER_ID= oh.ORDER_ID
 where order_Type_Id="SALES_ORDER" and oh.ORDER_DATE BETWEEN '2023-08-01 00:00:00' AND '2023-08-31 23:59:59';
 
 -- 7
-select oh.ORDER_ID, oh.status_id as ORDER_STATUS, opp.status_id as PAYMENT_STATUS, sh.status_id as SHIPMENT_STATUS
+select distinct oh.ORDER_ID, oh.status_id as ORDER_STATUS, opp.status_id as PAYMENT_STATUS, ss.status_id as SHIPMENT_STATUS
 from order_header as oh
-join Order_Payment_Preference as opp on opp.ORDER_ID= oh.ORDER_ID
-join Order_Shipment as os on os.ORDER_ID=oh.ORDER_ID
-join shipment as sh on sh.Shipment_Id = os.Shipment_Id
-where opp.status_id= "PAYMENT_SETTLED" and sh.status_id NOT IN ("SHIPMENT_SHIPPED");
+left join Order_Payment_Preference as opp on opp.ORDER_ID= oh.ORDER_ID
+LEFT JOIN order_shipment AS os ON os.ORDER_ID = oh.ORDER_ID
+LEFT JOIN shipment_status AS ss ON ss.SHIPMENT_ID = os.SHIPMENT_ID
+where opp.STATUS_ID = 'PAYMENT_SETTLED' AND (ss.STATUS_ID IS NULL OR ss.STATUS_ID != 'SHIPMENT_SHIPPED');
 
 -- 8
 select HOUR(os.STATUS_DATETIME) AS HOURS, COUNT(oh.ORDER_ID) AS TOTAL_ORDER
@@ -70,26 +66,23 @@ group by HOURS
 order by hours asc;
 
 -- 9
-select  count(oh.ORDER_ID) as TOTAL_ORDERS, sum(oh.GRAND_TOTAL) as TOTAL_REVENUE
+select  count(distinct oh.ORDER_ID) as TOTAL_ORDERS, sum(distinct oh.GRAND_TOTAL) as TOTAL_REVENUE
 from order_header oh
-join order_item_ship_group oisp on oh.ORDER_ID = oisp.ORDER_ID
-where oh.SALES_CHANNEL_ENUM_ID = "WEB_SALES_CHANNEL" 
-and oh.STATUS_ID="ORDER_COMPLETED" 
-and oh.ORDER_TYPE_ID = "SALES_ORDER" 
-and YEAR(oh.ORDER_DATE) = 2023
-and oisp.SHIPMENT_METHOD_TYPE_ID = "STOREPICKUP";   
+join Shipment as ship on ship.PRIMARY_ORDER_ID = oh.ORDER_ID
+where oh.STATUS_ID="ORDER_COMPLETED" 
+and YEAR(oh.ENTRY_DATE) = YEAR(CURDATE()) - 1
+and ship.SHIPMENT_METHOD_TYPE_ID = "STOREPICKUP";     
 
 -- 10
 select COUNT(oh.ORDER_ID) AS TOTAL_ORDERS, os.CHANGE_REASON AS CANCELATION_REASON
 from order_header oh
 join order_status os ON oh.ORDER_ID = os.ORDER_ID
 where oh.STATUS_ID = "ORDER_CANCELLED"
-and os.STATUS_DATETIME >= DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '24-%m-01')
-and os.STATUS_DATETIME < DATE_FORMAT(NOW(), '24-%m-01')
+AND MONTH(os.STATUS_DATETIME) = MONTH(CURRENT_DATE())-1
 group by os.CHANGE_REASON;
 
 -- 11
-SELECT p.PRODUCT_ID, (ii.quantity_On_Hand_Total - ii.available_To_Promise_Total) AS THRESHOLD
-FROM product AS p
-JOIN Inventory_Item AS ii ON ii.product_id = p.product_id;
+select distinct pf.PRODUCT_ID, pf.minimum_stock AS THRESHOLD
+from product_facility as pf
+join facility f on f.FACILITY_ID =pf.FACILITY_ID and f.FACILITY_TYPE_ID = 'CONFIGURATION';
 ```
